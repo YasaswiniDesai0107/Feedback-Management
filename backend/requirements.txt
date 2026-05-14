@@ -1,0 +1,20 @@
+# ============================================================
+# Feedback Management System — Python Dependencies
+# Phase 1: Backend Foundation
+# ============================================================
+
+# --- Web Framework ---
+fastapi==0.115.6          # FastAPI — the web framework
+uvicorn[standard]==0.32.1 # ASGI server to run FastAPI
+
+# --- Database ---
+sqlalchemy==2.0.36        # SQLAlchemy ORM for database interactions
+pymysql==1.1.1            # MySQL driver (pure Python — no C deps needed)
+cryptography==43.0.3      # Required by PyMySQL for secure connections
+
+# --- Data Validation ---
+pydantic==2.10.3          # Data validation and serialization (Python 3.13 compatible)
+pydantic-settings==2.7.0  # Pydantic v2 extension for .env settings loading
+
+# --- Utility ---
+python-dotenv==1.0.1      # Loads .env files (backup — pydantic-settings handles this)
