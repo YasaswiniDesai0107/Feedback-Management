@@ -14,13 +14,18 @@ This file should stay THIN:
   - Just: receive request → call service → return response
 """
 
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.feedback_schema import FeedbackCreate, FeedbackResponse, FeedbackUpdate
+from app.schemas.feedback_schema import (
+    FeedbackCreate,
+    FeedbackResponse,
+    FeedbackUpdate,
+    SearchResult,
+)
 from app.services import feedback_service
 
 # -------------------------------------------------------------------
@@ -54,6 +59,71 @@ def get_all_feedbacks(db: Session = Depends(get_db)):
     - **Status 200**: Always returns 200 (even if empty list).
     """
     return feedback_service.get_all_feedbacks_service(db)
+
+
+# -------------------------------------------------------------------
+# GET /feedback/search  (Step 3)
+# IMPORTANT: This route MUST be declared BEFORE /{feedback_id}
+# to prevent FastAPI from interpreting "search" as an integer ID.
+# -------------------------------------------------------------------
+@router.get(
+    "/search",
+    response_model=SearchResult,
+    status_code=status.HTTP_200_OK,
+    summary="Search and filter feedbacks",
+    description=(
+        "Search feedback records using any combination of filters:\n"
+        "- **keyword**: searches participant name, program name, and comments\n"
+        "- **rating**: exact rating match (1–5)\n"
+        "- **program_name**: partial program name match\n"
+        "- **skip** / **limit**: pagination controls"
+    ),
+)
+def search_feedbacks(
+    keyword:      Optional[str] = Query(default=None, description="Search in name, program, or comments"),
+    rating:       Optional[int] = Query(default=None, ge=1, le=5, description="Filter by exact rating (1–5)"),
+    program_name: Optional[str] = Query(default=None, description="Filter by program name (partial match)"),
+    skip:         int           = Query(default=0,    ge=0, description="Pagination offset"),
+    limit:        int           = Query(default=20,   ge=1, le=100, description="Page size (max 100)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Search and filter feedbacks with combined criteria.
+
+    **Example URLs:**
+    - `/api/v1/feedback/search?keyword=python`
+    - `/api/v1/feedback/search?rating=5`
+    - `/api/v1/feedback/search?program_name=AI+Workshop`
+    - `/api/v1/feedback/search?keyword=data&rating=4&skip=0&limit=10`
+    """
+    return feedback_service.search_feedbacks_service(
+        db,
+        keyword=keyword,
+        rating=rating,
+        program_name=program_name,
+        skip=skip,
+        limit=limit,
+    )
+
+
+# -------------------------------------------------------------------
+# GET /feedback/programs  (Step 3)
+# Returns distinct program names for filter dropdown
+# -------------------------------------------------------------------
+@router.get(
+    "/programs",
+    response_model=List[str],
+    status_code=status.HTTP_200_OK,
+    summary="Get distinct program names",
+    description="Returns a sorted list of all unique program names. Used to populate filter dropdowns.",
+)
+def get_distinct_programs(db: Session = Depends(get_db)):
+    """
+    Returns all unique program names for the filter dropdown.
+
+    - **Returns**: Sorted list of unique program name strings.
+    """
+    return feedback_service.get_distinct_programs_service(db)
 
 
 # -------------------------------------------------------------------

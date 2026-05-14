@@ -6,14 +6,14 @@ CRUD = Create, Read, Update, Delete
 This layer contains ALL direct database operations.
 It only knows about SQLAlchemy — it does NOT know about HTTP or FastAPI.
 
-Why a separate CRUD layer?
-  - Keeps database logic isolated from business logic and HTTP routing.
-  - Makes it easy to write unit tests for DB operations independently.
-  - If we ever switch from MySQL to PostgreSQL, only this file changes.
+Step 3 additions:
+  - search_feedbacks()     → keyword + rating + program filter with pagination
+  - get_distinct_programs() → unique program names for filter dropdown
 """
 
 from typing import List, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.feedback_model import Feedback
@@ -149,3 +149,94 @@ def delete_feedback(db: Session, feedback_id: int) -> Optional[Feedback]:
     db.commit()                   # execute DELETE in DB
 
     return existing_feedback      # return the deleted object for confirmation
+
+
+# -------------------------------------------------------------------
+# SEARCH: Filter feedbacks by keyword / rating / program (Step 3)
+# -------------------------------------------------------------------
+def search_feedbacks(
+    db: Session,
+    keyword: Optional[str] = None,
+    rating: Optional[int] = None,
+    program_name: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+) -> dict:
+    """
+    Search and filter feedback records with optional combined filters.
+
+    Args:
+        db           : Active SQLAlchemy session.
+        keyword      : Free-text search across participant_name, program_name, comments.
+        rating       : Exact rating match (1–5).
+        program_name : Partial match against program_name (case-insensitive).
+        skip         : Pagination offset (0 = first page).
+        limit        : Max records to return per page (default 20, max 100).
+
+    Returns:
+        dict with keys:
+          - 'results'  : List of Feedback ORM objects for current page
+          - 'total'    : Total matching records (for pagination UI)
+          - 'skip'     : Current offset
+          - 'limit'    : Current page size
+    """
+    # Start with the base query
+    query = db.query(Feedback)
+
+    # --- Keyword search: match any of the three text fields ---
+    # ilike = case-insensitive LIKE in SQLAlchemy
+    if keyword and keyword.strip():
+        pattern = f"%{keyword.strip()}%"
+        query = query.filter(
+            or_(
+                Feedback.participant_name.ilike(pattern),
+                Feedback.program_name.ilike(pattern),
+                Feedback.comments.ilike(pattern),
+            )
+        )
+
+    # --- Exact rating filter ---
+    if rating is not None:
+        query = query.filter(Feedback.rating == rating)
+
+    # --- Program name partial match ---
+    if program_name and program_name.strip():
+        query = query.filter(
+            Feedback.program_name.ilike(f"%{program_name.strip()}%")
+        )
+
+    # --- Count total BEFORE applying pagination ---
+    # This lets the frontend show "X results found"
+    total = query.count()
+
+    # --- Apply sort + pagination ---
+    results = (
+        query
+        .order_by(Feedback.submitted_at.desc())
+        .offset(skip)
+        .limit(min(limit, 100))  # cap at 100 to prevent abuse
+        .all()
+    )
+
+    return {"results": results, "total": total, "skip": skip, "limit": limit}
+
+
+# -------------------------------------------------------------------
+# UTILITY: Get distinct program names for filter dropdown (Step 3)
+# -------------------------------------------------------------------
+def get_distinct_programs(db: Session) -> List[str]:
+    """
+    Return a sorted list of all unique program names in the database.
+    Used to populate the 'Filter by Program' dropdown in the frontend.
+
+    Returns:
+        List of unique program name strings, alphabetically sorted.
+    """
+    rows = (
+        db.query(Feedback.program_name)
+        .distinct()
+        .order_by(Feedback.program_name.asc())
+        .all()
+    )
+    # Each row is a tuple like ('Data Science Bootcamp',) — extract the string
+    return [row[0] for row in rows]

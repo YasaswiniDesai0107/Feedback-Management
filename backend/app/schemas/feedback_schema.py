@@ -166,3 +166,38 @@ class APIResponse(BaseModel):
         default=None,
         description="The feedback record (if applicable)",
     )
+
+
+# -------------------------------------------------------------------
+# 6. Search Result Schema — paginated search/filter response (Step 3)
+# -------------------------------------------------------------------
+from typing import List as _List  # local alias to avoid name collision above
+
+class SearchResult(BaseModel):
+    """
+    Response schema for GET /feedback/search.
+    Wraps the result list with pagination metadata so the frontend
+    can build page controls and show 'X results found'.
+
+    Fields:
+        results : List of matching feedback records (current page only)
+        total   : Total matching records across ALL pages
+        skip    : Current pagination offset
+        limit   : Page size used
+        keyword : Echo of the search keyword (for UI display)
+    """
+    results: _List[FeedbackResponse] = Field(
+        description="Feedback records matching the search criteria"
+    )
+    total: int = Field(
+        description="Total number of matching records (all pages)"
+    )
+    skip: int = Field(
+        description="Number of records skipped (pagination offset)"
+    )
+    limit: int = Field(
+        description="Maximum records per page"
+    )
+
+    class Config:
+        from_attributes = True

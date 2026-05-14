@@ -14,7 +14,7 @@ Think of it as the "brain" of the application:
   CRUD    → executes raw database operations
 """
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -118,3 +118,57 @@ def delete_feedback_service(db: Session, feedback_id: int) -> Feedback:
         )
 
     return deleted_feedback
+
+
+def search_feedbacks_service(
+    db: Session,
+    keyword: Optional[str] = None,
+    rating: Optional[int] = None,
+    program_name: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+) -> dict:
+    """
+    Business logic for the search/filter endpoint (Step 3).
+
+    Validates the pagination inputs, then delegates to CRUD.
+
+    Args:
+        db           : Database session.
+        keyword      : Free-text search term.
+        rating       : Exact rating filter (1–5).
+        program_name : Program name partial filter.
+        skip         : Pagination offset (must be ≥ 0).
+        limit        : Page size (1–100).
+
+    Returns:
+        dict with 'results', 'total', 'skip', 'limit'.
+    """
+    # Validate pagination params
+    if skip < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'skip' must be 0 or greater.",
+        )
+    if not (1 <= limit <= 100):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'limit' must be between 1 and 100.",
+        )
+
+    return feedback_crud.search_feedbacks(
+        db,
+        keyword=keyword,
+        rating=rating,
+        program_name=program_name,
+        skip=skip,
+        limit=limit,
+    )
+
+
+def get_distinct_programs_service(db: Session) -> list:
+    """
+    Returns a sorted list of all unique program names.
+    Powers the 'Filter by Program' dropdown in the frontend.
+    """
+    return feedback_crud.get_distinct_programs(db)

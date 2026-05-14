@@ -59,3 +59,30 @@ export const deleteFeedback = async (id) => {
   const response = await api.delete(`/feedback/${id}`);
   return response.data; // returns confirmation object
 };
+
+// ---------------------------------------------------------------
+// GET /feedback/search  (Step 3)
+// Search and filter feedbacks with optional query params.
+//
+// Params object (all optional):
+//   { keyword, rating, program_name, skip, limit }
+//
+// Returns: { results: [...], total, skip, limit }
+// ---------------------------------------------------------------
+export const searchFeedbacks = async (params = {}) => {
+  // axios will serialize the params object into query string automatically:
+  // e.g. { keyword: 'python', rating: 5 } → ?keyword=python&rating=5
+  // undefined values are automatically omitted from the query string
+  const response = await api.get('/feedback/search', { params });
+  return response.data; // returns SearchResult { results, total, skip, limit }
+};
+
+// ---------------------------------------------------------------
+// GET /feedback/programs  (Step 3)
+// Fetch all distinct program names for the filter dropdown.
+// Returns: ["AI Workshop", "Data Science Bootcamp", ...]
+// ---------------------------------------------------------------
+export const getDistinctPrograms = async () => {
+  const response = await api.get('/feedback/programs');
+  return response.data; // returns array of strings
+};
